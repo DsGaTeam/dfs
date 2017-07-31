@@ -3,6 +3,7 @@ import pickle
 import socket
 import sys
 import threading
+from pprint import pprint
 
 from common import MessageTypes
 
@@ -112,7 +113,7 @@ def ls(server_address, path):
 
 
 def mk(server_address, path):
-    one_step_operation(server_address, MessageTypes.MK, MessageTypes.MK_ANSWER, path)
+    return one_step_operation(server_address, MessageTypes.MK, MessageTypes.MK_ANSWER, path)
 
 
 def rm(server_address, path):
@@ -152,7 +153,8 @@ while cmd != 'exit':
         elif command == 'mk':
             ensure_amount_of_params(params, 2)
             res = mk(NAMING_SERVER_ADDRESS, params[1])
-            if res[2]:
+            pprint (res)
+            if res:
                 output = 'Folder \'' + params[1] + '\' was successfully created.'
             else:
                 output = 'Folder \'' + params[1] + '\' was not created!'
@@ -163,5 +165,7 @@ while cmd != 'exit':
         else:
             print('Unrecognized command \'' + command + '\'!')
 
-    except Exception as e:
-        logging.error(e)
+#    except Exception as e:
+#        logging.error(e)
+    finally:
+        pass
