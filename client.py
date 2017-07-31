@@ -4,13 +4,11 @@ import socket
 import sys
 import threading
 
-from prompt_toolkit import buffer_mapping
-from zmq.backend.cython import socket
-
 from common import MessageTypes
 
 
-buffer_size = 1024
+BUFFER_SIZE = 1024
+NAMING_SERVER_ADDRESS = ('localhost', 9000)
 
 
 # BUSINESS LOGIC SERVICE FUNCTIONS
@@ -51,7 +49,7 @@ def one_step_operation(server_address, msg_type, response_type, path):
         msg_bytes = pack_message(msg_type, path)
         sock.send(msg_bytes)
 
-        msg_bytes = sock.recv(buffer_size)
+        msg_bytes = sock.recv(BUFFER_SIZE)
         msg = unpack_message(msg_bytes)
 
         ensure_msg_validity(msg, response_type, 3)
@@ -69,7 +67,7 @@ def read(server_address, file_name):
         msg_read_bytes = pack_message(MessageTypes.READ, file_name)
         sock.send(msg_read_bytes)
 
-        msg_bytes = sock.recv(buffer_size)
+        msg_bytes = sock.recv(BUFFER_SIZE)
         msg = unpack_message(msg_bytes)
         ensure_msg_validity(msg, MessageTypes.READ_ANSWER, 3)
     finally:
@@ -82,7 +80,7 @@ def read(server_address, file_name):
         try:
             sock.send(msg_read_bytes)
 
-            msg_bytes = sock.recv(buffer_size)
+            msg_bytes = sock.recv(BUFFER_SIZE)
             msg = unpack_message(msg_bytes)
             ensure_msg_validity(msg, MessageTypes.READ_ANSWER, 3)
 
@@ -130,7 +128,6 @@ def ensure_amount_of_params(params, amount):
 
 # COMMAND LINE INTERFACE
 
-naming_server_address = ('localhost', 124)
 cmd = ''
 while cmd != 'exit':
     cmd = sys.stdin.readline().strip()
@@ -150,9 +147,17 @@ while cmd != 'exit':
         elif command == 'cd':
             pass
         elif command == 'ls':
-            ls(naming_server_address, command)
+            ensure_amount_of_params(params, 2)
+            res = ls(NAMING_SERVER_ADDRESS, params[1])
         elif command == 'mk':
-            pass
+            ensure_amount_of_params(params, 2)
+            res = mk(NAMING_SERVER_ADDRESS, params[1])
+            if res[2]:
+                output = 'Folder \'' + params[1] + '\' was successfully created.'
+            else:
+                output = 'Folder \'' + params[1] + '\' was not created!'
+            print(output)
+            logging.info(output)
         elif command == 'rm':
             pass
         else:
