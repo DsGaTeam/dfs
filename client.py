@@ -5,7 +5,6 @@ import sys
 import threading
 
 from prompt_toolkit import buffer_mapping
-from zmq.backend.cython import socket
 
 from common import MessageTypes
 
