@@ -2,7 +2,6 @@ import logging
 import pickle
 import socket
 import sys
-import threading
 from pprint import pprint
 
 from common import MessageTypes
@@ -97,7 +96,7 @@ def write(server_address, file_name, string):
 
 
 def info(server_address, file_name):
-    one_step_operation(server_address, MessageTypes.INFO, MessageTypes.INFO_ANSWER, file_name)
+    return one_step_operation(server_address, MessageTypes.INFO, MessageTypes.INFO_ANSWER, file_name)
 
 
 def delete(server_address, file_name):
@@ -105,11 +104,11 @@ def delete(server_address, file_name):
 
 
 def cd(server_address, path):
-    one_step_operation(server_address, MessageTypes.CD, MessageTypes.CD_ANSWER, path)
+    return one_step_operation(server_address, MessageTypes.CD, MessageTypes.CD_ANSWER, path)
 
 
 def ls(server_address, path):
-    one_step_operation(server_address, MessageTypes.LS, MessageTypes.LS_ANSWER, path)
+    return one_step_operation(server_address, MessageTypes.LS, MessageTypes.LS_ANSWER, path)
 
 
 def mk(server_address, path):
@@ -139,29 +138,51 @@ while cmd != 'exit':
 
         if command == 'read':
             pass
+
         elif command == 'write':
             pass
+
         elif command == 'info':
-            pass
+            ensure_amount_of_params(params, 2)
+            res = info(NAMING_SERVER_ADDRESS, params[1])
+            print(res)
+            logging.info(res)
+
         elif command == 'delete':
             pass
+
         elif command == 'cd':
-            pass
+            ensure_amount_of_params(params, 2)
+            res = cd(NAMING_SERVER_ADDRESS, params[1])
+            if cd:
+                output = 'Changed folder to: \'' + params[1] + '\''
+            else:
+                output = 'Unable to change folder to: \'' + params[1] + '\''
+            print(output)
+            logging.info(output)
+
         elif command == 'ls':
             ensure_amount_of_params(params, 2)
             res = ls(NAMING_SERVER_ADDRESS, params[1])
+            print('Content of the folder ' + params[1] + '\'')
+            logging.info('Content of the folder ' + params[1] + '\'')
+            for line in res:
+                print(line)
+                logging.info(line)
+
         elif command == 'mk':
             ensure_amount_of_params(params, 2)
             res = mk(NAMING_SERVER_ADDRESS, params[1])
-            pprint (res)
             if res:
                 output = 'Folder \'' + params[1] + '\' was successfully created.'
             else:
                 output = 'Folder \'' + params[1] + '\' was not created!'
             print(output)
             logging.info(output)
+
         elif command == 'rm':
             pass
+
         else:
             print('Unrecognized command \'' + command + '\'!')
 
