@@ -155,7 +155,7 @@ print("Naming server connected to DB")
 #res = mk("/home/testuser/somedirA")
 #print str(res)
 
-#res = write("/home/testuser/somedir/somefile4.txt", 123456)
+#res = write("/home/idmitriev/somefile567.txt", 123)
 #print str(res)
 
 #res = rm("/home/testuser/somedir")
