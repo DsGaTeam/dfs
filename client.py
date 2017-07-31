@@ -3,19 +3,94 @@ import pickle
 import socket
 import sys
 import threading
+
+from prompt_toolkit import buffer_mapping
+from zmq.backend.cython import socket
+
 from common import MessageTypes
 
 
-def send(address, data):
+buffer_size = 1024
+
+
+# BUSINESS LOGIC SERVICE FUNCTIONS
+
+def open_socket(address):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(1)
+    sock.connect(address)
+    return sock
+
+
+def ensure_msg_validity(msg, expected_type, expected_length):
+    if msg[0] != expected_type:
+        raise TypeError('Incorrect message type! Expected ' + expected_type + ' but got instead ' + msg[0])
+    if len(msg) != expected_length:
+        raise ValueError('Incorrect size of response tuple! Expected ' + expected_length + ' but received ' + len(msg))
+
+
+def pack_message(msg_type, path, obj=None):
+    if obj is not None:
+        result = pickle.dumps((msg_type, path, obj))
+    else:
+        result = pickle.dumps((msg_type, path))
+    return result
+
+
+def unpack_message(obj):
+    return pickle.loads(obj)
+
+
+# BUSINESS LOGIC
+
+def one_step_operation(server_address, msg_type, response_type, path):
+    sock = None
     try:
-        sock.sendto(data, address)
+        sock = open_socket(server_address)
+
+        msg_bytes = pack_message(msg_type, path)
+        sock.send(msg_bytes)
+
+        msg_bytes = sock.recv(buffer_size)
+        msg = unpack_message(msg_bytes)
+
+        ensure_msg_validity(msg, response_type, 3)
+        return msg[2]
     finally:
-        sock.close()
+        if sock is not None:
+            sock.close()
 
 
 def read(server_address, file_name):
-    pass
+    sock = None
+    try:
+        sock = open_socket(server_address)
+
+        msg_read_bytes = pack_message(MessageTypes.READ, file_name)
+        sock.send(msg_read_bytes)
+
+        msg_bytes = sock.recv(buffer_size)
+        msg = unpack_message(msg_bytes)
+        ensure_msg_validity(msg, MessageTypes.READ_ANSWER, 3)
+    finally:
+        if sock is not None:
+            sock.close()
+
+    for storage in msg[2]:
+        sock = open_socket(storage)
+
+        try:
+            sock.send(msg_read_bytes)
+
+            msg_bytes = sock.recv(buffer_size)
+            msg = unpack_message(msg_bytes)
+            ensure_msg_validity(msg, MessageTypes.READ_ANSWER, 3)
+
+            return msg[2]
+        except socket.timeout:
+            logging.error('Timeout was reached with storage ' + storage)
+        finally:
+            sock.close()
 
 
 def write(server_address, file_name, string):
@@ -23,7 +98,7 @@ def write(server_address, file_name, string):
 
 
 def info(server_address, file_name):
-    pass
+    one_step_operation(server_address, MessageTypes.INFO, MessageTypes.INFO_ANSWER, file_name)
 
 
 def delete(server_address, file_name):
@@ -31,22 +106,57 @@ def delete(server_address, file_name):
 
 
 def cd(server_address, path):
-    pass
+    one_step_operation(server_address, MessageTypes.CD, MessageTypes.CD_ANSWER, path)
 
 
 def ls(server_address, path):
-    pass
+    one_step_operation(server_address, MessageTypes.LS, MessageTypes.LS_ANSWER, path)
 
 
 def mk(server_address, path):
-    pass
+    one_step_operation(server_address, MessageTypes.MK, MessageTypes.MK_ANSWER, path)
 
 
 def rm(server_address, path):
     pass
 
 
+# COMMAND LINE SERVICE FUNCTIONS
+
+def ensure_amount_of_params(params, amount):
+    if len(params) != amount:
+        raise ValueError('Incorrect amount of command\'s parameters! Expected ' + amount + ' but received ' + len(params))
+
+
+# COMMAND LINE INTERFACE
+
+naming_server_address = ('localhost', 124)
 cmd = ''
 while cmd != 'exit':
     cmd = sys.stdin.readline().strip()
-    print(cmd)
+
+    try:
+        params = cmd.split(' ')
+        command = params[0]
+
+        if command == 'read':
+            pass
+        elif command == 'write':
+            pass
+        elif command == 'info':
+            pass
+        elif command == 'delete':
+            pass
+        elif command == 'cd':
+            pass
+        elif command == 'ls':
+            ls(naming_server_address, command)
+        elif command == 'mk':
+            pass
+        elif command == 'rm':
+            pass
+        else:
+            print('Unrecognized command \'' + command + '\'!')
+
+    except Exception as e:
+        logging.error(e)
