@@ -5,10 +5,11 @@ USE `dfs`;
 CREATE TABLE `files` (
     `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
     `name` VARCHAR(255),
-    `parent_id` int(10) unsigned NULL,
+    `parent_id` int(10) NOT NULL DEFAULT 0,
     `is_folder` BOOLEAN,
     `size` int(10),
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `fname` (`name`,`parent_id`)
 )
 CHARACTER SET utf8 COLLATE utf8_unicode_ci;
 
