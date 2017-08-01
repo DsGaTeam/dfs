@@ -43,7 +43,7 @@ def rm(name):
 
 
 def mk(name):
-    print "mk " + name
+    print("mk " + name)
     dirs = name.split("/")
     parent_id = 0
 
@@ -79,10 +79,10 @@ def mk(name):
 
 
 def write(name, size):
-    print "write " + name
+    print("write " + name)
     dirs = name.split("/")
     filename = dirs.pop()
-    print "filename is " + filename + " with size " + str(size)
+    print("filename is " + filename + " with size " + str(size))
     parent_id = 0
 
     cursor = db.cursor()
@@ -121,7 +121,7 @@ def server():
     sock.listen(1)
     conn, addr = sock.accept()
 
-    print 'connected:', addr
+    print('connected:', addr)
 
     while True:
         data = conn.recv(1024)
@@ -131,7 +131,7 @@ def server():
         msg = pickle.loads(data)
         msg_type = msg[0]
         msg_param = msg[1]
-        print "Received message " + msg_type
+        print("Received message " + msg_type)
         pprint (msg)
 
         # RESPONSE
@@ -139,7 +139,7 @@ def server():
             result = mk(msg_param)
             r_msg = (MessageTypes.MK_ANSWER, msg_param, result)
 
-        print "Response message"
+        print("Response message")
         pprint (r_msg)
 
         response_msg = pickle.dumps(r_msg)
