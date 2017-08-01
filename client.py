@@ -2,7 +2,6 @@ import logging
 import pickle
 import socket
 import sys
-from pprint import pprint
 
 from common import MessageTypes
 
@@ -22,9 +21,10 @@ def open_socket(address):
 
 def ensure_msg_validity(msg, expected_type, expected_length):
     if msg[0] != expected_type:
-        raise TypeError('Incorrect message type! Expected ' + expected_type + ' but got instead ' + msg[0])
+        raise TypeError('Incorrect message type! Expected ' + str(expected_type) + ' but got instead ' + str(msg[0]))
     if len(msg) != expected_length:
-        raise ValueError('Incorrect size of response tuple! Expected ' + expected_length + ' but received ' + len(msg))
+        raise ValueError('Incorrect size of response tuple! Expected '
+                         + str(expected_length) + ' but received ' + str(len(msg)))
 
 
 def pack_message(msg_type, path, obj=None):
@@ -37,6 +37,24 @@ def pack_message(msg_type, path, obj=None):
 
 def unpack_message(obj):
     return pickle.loads(obj)
+
+
+def get_file_size(file_name):
+    import os
+    stat_info = os.stat(file_name)
+    return stat_info.st_size
+
+
+def read_file(file_name):
+    result = ''
+    file = open(file_name)
+    try:
+        for line in file:
+            result += line
+    finally:
+        if file is not None:
+            file.close()
+    return result
 
 
 # BUSINESS LOGIC
@@ -86,13 +104,54 @@ def read(server_address, file_name):
 
             return msg[2]
         except socket.timeout:
-            logging.error('Timeout was reached with storage ' + storage)
+            logging.error('Timeout was reached with storage ' + str(storage))
+        finally:
+            sock.close()
+    return 'Error! Unable to read file. Timeout was reached while trying to read from storage.'
+
+
+def write(server_address, dfs_file_name, local_file_name):
+    file_size = get_file_size(local_file_name)
+    file_content = read_file(local_file_name)
+
+    sock = None
+    try:
+        sock = open_socket(server_address)
+
+        msg_bytes = pack_message(MessageTypes.WRITE_NAMING, dfs_file_name, file_size)
+        sock.send(msg_bytes)
+
+        msg_bytes = sock.recv(BUFFER_SIZE)
+        msg = unpack_message(msg_bytes)
+        ensure_msg_validity(msg, MessageTypes.WRITE_NAMING_ANSWER, 3)
+    finally:
+        if sock is not None:
+            sock.close()
+
+    success = []
+    for storage in msg[2]:
+        sock = open_socket(storage)
+
+        try:
+            msg_bytes = pack_message(MessageTypes.WRITE_STORAGE, dfs_file_name, file_content)
+            sock.send(msg_bytes)
+
+            msg_bytes = sock.recv(BUFFER_SIZE)
+            msg = unpack_message(msg_bytes)
+            ensure_msg_validity(msg, MessageTypes.WRITE_STORAGE_ANSWER)
+
+            if msg[2]:
+                success.append(True)
+            else:
+                success.append(False)
+        except socket.timeout:
+            logging.error('Timeout was reached with storage ' + str(storage))
         finally:
             sock.close()
 
-
-def write(server_address, file_name, string):
-    pass
+    s = success.count(True)
+    l = len(success)
+    return 'Successfully wrote to ' + str(s) + ' out of ' + str(l) + ' storage.'
 
 
 def info(server_address, file_name):
@@ -100,7 +159,7 @@ def info(server_address, file_name):
 
 
 def delete(server_address, file_name):
-    pass
+    return one_step_operation(server_address, MessageTypes.DELETE, MessageTypes.DELETE_ANSWER, file_name)
 
 
 def cd(server_address, path):
@@ -116,14 +175,15 @@ def mk(server_address, path):
 
 
 def rm(server_address, path):
-    pass
+    return one_step_operation(server_address, MessageTypes.RM, MessageTypes.RM_ANSWER, path)
 
 
 # COMMAND LINE SERVICE FUNCTIONS
 
 def ensure_amount_of_params(params, amount):
     if len(params) != amount:
-        raise ValueError('Incorrect amount of command\'s parameters! Expected ' + amount + ' but received ' + len(params))
+        raise ValueError('Incorrect amount of command\'s parameters! Expected '
+                         + str(amount) + ' but received ' + str(len(params)))
 
 
 # COMMAND LINE INTERFACE
@@ -137,10 +197,16 @@ while cmd != 'exit':
         command = params[0]
 
         if command == 'read':
-            pass
+            ensure_amount_of_params(params, 2)
+            res = read(NAMING_SERVER_ADDRESS, params[1])
+            print(res)
+            logging.info(res)
 
         elif command == 'write':
-            pass
+            ensure_amount_of_params(params, 3)
+            res = write(NAMING_SERVER_ADDRESS, params[1], params[2])
+            print(res)
+            logging.info(res)
 
         elif command == 'info':
             ensure_amount_of_params(params, 2)
@@ -149,7 +215,14 @@ while cmd != 'exit':
             logging.info(res)
 
         elif command == 'delete':
-            pass
+            ensure_amount_of_params(params, 2)
+            res = mk(NAMING_SERVER_ADDRESS, params[1])
+            if res:
+                output = 'File \'' + params[1] + '\' was successfully removed.'
+            else:
+                output = 'File \'' + params[1] + '\' was not removed!'
+            print(output)
+            logging.info(output)
 
         elif command == 'cd':
             ensure_amount_of_params(params, 2)
@@ -181,12 +254,16 @@ while cmd != 'exit':
             logging.info(output)
 
         elif command == 'rm':
-            pass
+            ensure_amount_of_params(params, 2)
+            res = rm(NAMING_SERVER_ADDRESS, params[1])
+            if res:
+                output = 'Successfully removed folder \'' + params[1] + '\''
+            else:
+                output = 'Unable to remove folder \'' + params[1] + '\''
+            print(output)
+            logging.info(output)
 
         else:
             print('Unrecognized command \'' + command + '\'!')
-
-#    except Exception as e:
-#        logging.error(e)
-    finally:
-        pass
+    except Exception as e:
+        logging.error(e)
