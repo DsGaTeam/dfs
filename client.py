@@ -123,13 +123,16 @@ def write(server_address, local_file_name, dfs_file_name):
 
         msg_bytes = sock.recv(BUFFER_SIZE)
         msg = unpack_message(msg_bytes)
-        ensure_msg_validity(msg, MessageTypes.WRITE_NAMING_ANSWER, 3)
+        ensure_msg_validity(msg, MessageTypes.WRITE_NAMING_ANSWER, 4)
     finally:
         if sock is not None:
             sock.close()
 
+    if not msg[2]:
+        return 'Unable to write file!'
+
     success = []
-    for storage in msg[2]:
+    for storage in msg[3]:
         sock = open_socket(storage)
 
         try:
