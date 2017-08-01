@@ -29,7 +29,6 @@ class SimpleSocket(object):
         logging.info('Started server on \'' + str(self.__server_address) + '\'')
         sock.bind(self.__server_address)
 
-        conn, address = sock.accept()
         while True:
             conn, address = sock.accept()
             received_data, client_address = sock.recvfrom(BUFFER_SIZE)
