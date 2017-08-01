@@ -5,6 +5,7 @@ import argparse
 import pickle
 import logging
 import os
+import shutil
 import socket
 import threading
 from common import MessageTypes
@@ -25,9 +26,10 @@ class SimpleSocket(object):
 
     def __start_server(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.bind(self.__server_address)
+        sock.listen(1)
         print('Started server on \'' + str(self.__server_address) + '\'')
         logging.info('Started server on \'' + str(self.__server_address) + '\'')
-        sock.bind(self.__server_address)
 
         while True:
             conn, address = sock.accept()
@@ -111,6 +113,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('id', help='ID of this storage node', type=int)
     args = ap.parse_args()
+    if os.path.isdir(STORAGE_PREFIX):
+        shutil.rmtree(STORAGE_PREFIX)
     os.makedirs(STORAGE_PREFIX)
     node = Node(
         storage_id=args.id-1,
@@ -118,7 +122,6 @@ def main():
         naming_address=('localhost', 9000),
     )
     node.start_server()
-    logging.info('Started storage server')
 
 
 if __name__ == '__main__':
