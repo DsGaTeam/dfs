@@ -66,13 +66,9 @@ class Node(SimpleSocket):
         if msg_type == MessageTypes.READ:
             self.do_read(path, client_address)
         elif msg_type == MessageTypes.WRITE:
-            self.do_write(path, obj, client_address, replicate=True)
-        elif msg_type == 'REPLICATE':
-            self.do_write(path, obj, client_address, replicate=False)
+            self.do_write(path, obj, client_address)
         elif msg_type == MessageTypes.DELETE:
             self.do_delete(path, client_address)
-        elif msg_type == 'INFO':
-            self.do_info(path, client_address)
         else:
             self.send_msg(client_address, 'INVALID_REQ')
 
@@ -85,18 +81,12 @@ class Node(SimpleSocket):
             data = fd.read()
         self.send_msg(address, MessageTypes.READ, data)
 
-    def do_write(self, path, obj, address, replicate):
+    def do_write(self, path, obj, address):
         localpath = os.path.join(STORAGE_PREFIX, *path.split('/'))
         localdir = os.path.split(localpath)[0]
         os.makedirs(localdir, exist_ok=True)
         with open(localpath, 'w') as fd:
-            fd.write(obj)
-        if not replicate:
-            return
-        for peer_id, peer_address in enumerate(self.storage_addresses):
-            if peer_id == self.storage_id:
-                continue
-            self.send_msg(peer_address, 'REPLICATE', obj)
+            self.write = fd.write(obj)
 
     def do_delete(self, path, address):
         localpath = os.path.join(STORAGE_PREFIX, *path.split('/'))
@@ -104,22 +94,7 @@ class Node(SimpleSocket):
             self.send_msg(address, MessageTypes.DELETE_ANSWER,'NOFILE')
             return
         os.remove(localpath)
-        # Recursively remove empty directories.
-        # while localpath != STORAGE_PREFIX:
-        #     prefix, suffix = os.path.split(localpath)
-        #     if len(os.listdir(prefix)) != 0:
-        #         break
-        #     os.rmdir(prefix)
-        #     localpath = prefix
         self.send_msg(address, MessageTypes.DELETE)
-
-    def do_info(self, path, address):
-        localpath = os.path.join(STORAGE_PREFIX, *path.split('/'))
-        if not os.path.isfile(localpath):
-            self.send_msg(address, MessageTypes.INFO_ANSWER, 'NOFILE')
-            return
-        size = os.path.getsize(localpath)
-        self.send_msg(address, 'INFO', size)
 
 
 def main():
