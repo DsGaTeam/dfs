@@ -124,6 +124,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('id', help='ID of this storage node', type=int)
     args = ap.parse_args()
+    os.makedirs(STORAGE_PREFIX)
     node = Node(
         storage_id=args.id-1,
         storage_addresses=[('localhost', 9001), ('localhost', 9002)],
