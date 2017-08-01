@@ -110,7 +110,7 @@ def read(server_address, file_name):
     return 'Error! Unable to read file. Timeout was reached while trying to read from storage.'
 
 
-def write(server_address, dfs_file_name, local_file_name):
+def write(server_address, local_file_name, dfs_file_name):
     file_size = get_file_size(local_file_name)
     file_content = read_file(local_file_name)
 
