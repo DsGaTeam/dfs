@@ -7,6 +7,8 @@ import MySQLdb
 from pprint import pprint
 from common import MessageTypes
 
+DEFAULT_PORT = 9000
+
 def rm(name):
     print("rm " + name)
     dirs = name.split("/")
@@ -221,28 +223,23 @@ def info(name):
         return not_found
 
 
-'''def get_storages():
+def get_storages():
     storages = []
     
     cursor = db.cursor()
-    cursor.execute("SELECT id, url, free_storage FROM storage")
+    cursor.execute("SELECT id, url, free_space FROM storage ORDER BY id ASC, free_space DESC")
 
-    storages.append(STORAGE1)
-    storages.append(STORAGE2)
+    for storage in cursor:
+        if storage:
+            print "Found storage:"
+            pprint (storage)
+            storages.append(storage)
 
-file_obj = cursor.fetchone()
-for file_obj in cursor:
-    if file_obj:
-
-    if file_obj:
-        print (str(file_obj[1]) + " found with id = " + str(file_obj[0]))
-        res = "name:" + str(file_obj[1]) + " size:" + str(file_obj[3]) + " is_folder: " + str(file_obj[2])
-        return res
-'''
+    return storages
 
 def server():
     sock = socket.socket()
-    sock.bind(('', 9000))
+    sock.bind(('', DEFAULT_PORT))
     sock.listen(1)
 
     while True:
@@ -282,14 +279,21 @@ def server():
                 file_size = int(msg[2])
                 result = write(msg_param, file_size)
 
-                STORAGE1 = ('localhost', 9001)
-                STORAGE2 = ('localhost', 9002)
+                storages_list = get_storages()
+
                 storages = []
-                storages.append(STORAGE1)
-                storages.append(STORAGE2)
+
+                for storage in storages_list:
+                    storage_port = DEFAULT_PORT + int(storage[0])  # id
+                    storage_host = str(storage[1])                 # url
+                    #storage[2]  # free storage
+                    STORAGE = (storage_host, storage_port)
+                    storages.append(STORAGE)
+
+                    if len(storages)>=2:
+                        break
 
                 r_msg = (MessageTypes.WRITE_NAMING_ANSWER, msg_param, result, storages)
-
 
             print("Response message")
             pprint (r_msg)
