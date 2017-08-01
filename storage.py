@@ -24,9 +24,11 @@ class SimpleSocket(object):
         self.__server_thread.start()
 
     def __start_server(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind(('', self.__server_address[1]))
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.bind(self.__server_address[1])
+        sock.listen(1)
 
+        conn, address = sock.accept()
         while True:
             received_data, client_address = sock.recvfrom(BUFFER_SIZE)
             self.receive(received_data, client_address)
@@ -34,17 +36,12 @@ class SimpleSocket(object):
     def receive(self, received_data, client_address):
         pass
 
-    @staticmethod
-    def send(server_address, data):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    def send(self, server_address, data):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             sock.sendto(data, server_address)
         finally:
             sock.close()
-
-    @staticmethod
-    def send_to_sock(sock, server_address, data):
-        sock.sendto(data, server_address)
 
 
 class Node(SimpleSocket):
@@ -118,8 +115,8 @@ def main():
         storage_addresses=[('localhost', 9001), ('localhost', 9002)],
         naming_address=('localhost', 9000),
     )
-    logging.info('Starting storage server')
     node.start_server()
+    logging.info('Started storage server')
 
 
 if __name__ == '__main__':
