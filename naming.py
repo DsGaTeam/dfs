@@ -8,6 +8,7 @@ from pprint import pprint
 from common import MessageTypes
 
 def rm(name):
+    print("rm " + name)
     dirs = name.split("/")
     dropdir = dirs.pop()
     parent_id = 0
@@ -30,12 +31,18 @@ def rm(name):
             print(e)
             return False
 
+    cursor = db.cursor()
     try:
         cursor.execute(
             "DELETE FROM files WHERE `name`=%s AND `parent_id`= %s AND is_folder=1",
             (dropdir,parent_id))
+        deleted_row_count = cursor.rowcount
         db.commit()
-        return True
+        if deleted_row_count > 0:
+            print dropdir + " was deleted"
+            return True
+        else:
+            return False
 
     except (MySQLdb.Error, MySQLdb.Warning) as e:
         print(e)
@@ -115,38 +122,148 @@ def write(name, size):
         print(e)
         return False
 
+
+def ls(name):
+    print("ls " + name)
+    dirs = name.split("/")
+    parent_id = 0
+
+    for dir in dirs:
+        if dir == '':
+            continue
+        cursor = db.cursor()
+        is_folder = True
+        size = 0
+
+        try:
+            cursor.execute("SELECT id FROM `files` WHERE name=%s AND parent_id=%s AND is_folder=1", (dir,parent_id))
+            file_obj = cursor.fetchone()
+            if file_obj:
+                print (dir + " found with id = " + str(file_obj[0]))
+                parent_id = file_obj[0]
+            else:
+                print (dir + " not found")
+                return False, []
+
+        except (MySQLdb.Error, MySQLdb.Warning) as e:
+            print(e)
+            return False, []
+
+    cursor = db.cursor()
+    res = []
+    try:
+        cursor.execute("SELECT name,is_folder FROM `files` WHERE parent_id=" + str(parent_id) + " ORDER BY is_folder DESC")
+        for file_obj in cursor:
+            if file_obj:
+                if int(file_obj[1])!=1:
+                    resf = "-"
+                else:
+                    resf = "d"
+
+                resf = resf + " " + str(file_obj[0])
+                print (resf)
+
+                res.append( resf )
+    except (MySQLdb.Error, MySQLdb.Warning) as e:
+        print(e)
+        return False, []
+
+    return True, res
+
+
+def info(name):
+    print("info " + name)
+    dirs = name.split("/")
+    target = dirs.pop()
+    print("target is " + target)
+    parent_id = 0
+    not_found = "cannot find target"
+    cursor = db.cursor()
+
+    for dir in dirs:
+        if dir == '':
+            continue
+        try:
+            cursor.execute("SELECT id FROM `files` WHERE name=%s AND parent_id=%s AND is_folder=1", (dir,parent_id))
+            file_obj = cursor.fetchone()
+            if file_obj:
+                print (dir + " found with id = " + str(file_obj[0]))
+                parent_id = file_obj[0]
+            else:
+                print (dir + " not found")
+                return not_found
+
+        except (MySQLdb.Error, MySQLdb.Warning) as e:
+            print(e)
+            return not_found
+
+    try:
+        cursor.execute("SELECT id, name, is_folder, size FROM `files` WHERE name=%s AND parent_id=%s", (target, parent_id))
+        file_obj = cursor.fetchone()
+        if file_obj:
+            print (str(file_obj[1]) + " found with id = " + str(file_obj[0]))
+            res = "name:" + str(file_obj[1]) + " size:" + str(file_obj[3]) + " is_folder: " + str(file_obj[2])
+            return res
+        else:
+            print (dir + " not found")
+            return not_found
+
+
+    except (MySQLdb.Error, MySQLdb.Warning) as e:
+        print(e)
+        return not_found
+
+
 def server():
     sock = socket.socket()
     sock.bind(('', 9000))
     sock.listen(1)
-    conn, addr = sock.accept()
-
-    print('connected:', addr)
 
     while True:
-        data = conn.recv(1024)
-        if not data:
-            break
-        # REQUEST
-        msg = pickle.loads(data)
-        msg_type = msg[0]
-        msg_param = msg[1]
-        print("Received message " + msg_type)
-        pprint (msg)
+        conn, addr = sock.accept()
 
-        # RESPONSE
-        if msg_type == MessageTypes.MK:
-            result = mk(msg_param)
-            r_msg = (MessageTypes.MK_ANSWER, msg_param, result)
+        print('connected:', addr)
 
-        print("Response message")
-        pprint (r_msg)
+        while True:
+            data = conn.recv(1024)
+            if not data:
+                break
+            # REQUEST
+            msg = pickle.loads(data)
+            msg_type = msg[0]
+            msg_param = msg[1]
+            print("Received message " + msg_type)
+            pprint (msg)
 
-        response_msg = pickle.dumps(r_msg)
+            # RESPONSE
+            if msg_type == MessageTypes.MK:
+                result = mk(msg_param)
+                r_msg = (MessageTypes.MK_ANSWER, msg_param, result)
 
-        conn.send(response_msg)
+            if msg_type == MessageTypes.RM:
+                result = rm(msg_param)
+                r_msg = (MessageTypes.RM_ANSWER, msg_param, result)
 
-    conn.close()
+            if msg_type == MessageTypes.LS:
+                result, ls_array = ls(msg_param)
+                if not result:
+                    ls_array=[]
+                r_msg = (MessageTypes.LS_ANSWER, msg_param, ls_array)
+
+            if msg_type == MessageTypes.INFO:
+                result = info(msg_param)
+                r_msg = (MessageTypes.INFO_ANSWER, msg_param, result)
+
+
+
+            print("Response message")
+            pprint (r_msg)
+
+            response_msg = pickle.dumps(r_msg)
+
+            conn.send(response_msg)
+
+        conn.close()
 
 
 db = MySQLdb.connect(host="localhost", user="root", passwd="qwerty", db="dfs", charset='utf8')
@@ -155,12 +272,16 @@ print("Naming server connected to DB")
 #res = mk("/home/testuser/somedirA")
 #print str(res)
 
-#res = write("/home/idmitriev/somefile567.txt", 123)
+#res = write("/home/somefile567.txt", 123)
 #print str(res)
 
 #res = rm("/home/testuser/somedir")
 #print str(res)
 
 server()
+
+#res = ls("/home/")
+#pprint (res)
+
 
 db.close()
