@@ -26,15 +26,15 @@ class SimpleSocket(object):
 
     def __start_server(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(self.__server_address)
+        sock.bind(('', self.__server_address[1]))
         sock.listen(1)
         print('Started server on \'' + str(self.__server_address) + '\'')
         logging.info('Started server on \'' + str(self.__server_address) + '\'')
 
         while True:
             conn, address = sock.accept()
-            received_data, client_address = sock.recvfrom(BUFFER_SIZE)
-            self.receive(received_data, client_address)
+            received_data = conn.recv(BUFFER_SIZE)
+            self.receive(received_data, address)
             conn.close()
 
     def receive(self, received_data, client_address):
