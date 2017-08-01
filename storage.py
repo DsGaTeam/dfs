@@ -34,18 +34,18 @@ class SimpleSocket(object):
         while True:
             conn, address = sock.accept()
             received_data = conn.recv(BUFFER_SIZE)
-            self.receive(received_data, address)
-            conn.close()
+            self.receive(conn, received_data, address)
+            if conn is not None:
+                conn.close()
 
-    def receive(self, received_data, client_address):
+    def receive(self, conn, received_data, client_address):
         pass
 
-    def send(self, server_address, data):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    def send(self, conn, server_address, data):
         try:
-            sock.sendto(data, server_address)
+            conn.sendto(data, server_address)
         finally:
-            sock.close()
+            conn.close()
 
 
 class Node(SimpleSocket):
@@ -55,32 +55,34 @@ class Node(SimpleSocket):
         self.storage_addresses = storage_addresses
         self.naming_address = naming_address
 
-    def send_msg(self, address, msg_type, data=None):
+    def send_msg(self, conn, address, msg_type, data=None):
         logging.info('Send to host ' + str(address) + ' message ' + str(msg_type))
-        self.send(address, pickle.dumps((msg_type, data)))
+        self.send(conn, address, pickle.dumps((msg_type, data)))
 
-    def receive(self, received_data, client_address):
+    def receive(self, conn, received_data, client_address):
         (msg_type, path, obj) = pickle.loads(received_data)
-        logging.INFO('Received from host ' + str(client_address) + ' message ' + str(msg_type))
+        logging.info('Received from host ' + str(client_address) + ' message ' + str(msg_type))
         if msg_type == MessageTypes.READ:
-            self.do_read(path, client_address)
+            self.do_read(conn, path, client_address)
         elif msg_type == MessageTypes.WRITE_STORAGE:
-            self.do_write(path, obj, client_address)
+            self.do_write(conn, path, obj, client_address)
         elif msg_type == MessageTypes.DELETE:
-            self.do_delete(path, client_address)
+            self.do_delete(conn, path, client_address)
+        elif msg_type == MessageTypes.RM:
+            self.do_rm(conn, path, client_address)
         else:
-            self.send_msg(client_address, 'INVALID_REQ')
+            self.send_msg(conn, client_address, 'INVALID_REQ')
 
-    def do_read(self, path, address):
+    def do_read(self, conn, path, address):
         local_path = os.path.join(STORAGE_PREFIX, *path.split('/'))
         if not os.path.isfile(local_path):
-            self.send_msg(address, MessageTypes.READ_ANSWER, 'NO FILE!')
+            self.send_msg(conn, address, MessageTypes.READ_ANSWER, 'NO FILE!')
             return
         with open(local_path) as fd:
             data = fd.read()
-        self.send_msg(address, MessageTypes.READ_ANSWER, data)
+        self.send_msg(conn, address, MessageTypes.READ_ANSWER, data)
 
-    def do_write(self, path, obj, address):
+    def do_write(self, conn, path, obj, address):
         local_path = os.path.join(STORAGE_PREFIX, *path.split('/'))
         local_dir = os.path.split(local_path)[0]
         os.makedirs(local_dir, exist_ok=True)
@@ -88,25 +90,25 @@ class Node(SimpleSocket):
         try:
             with open(local_path, 'w') as fd:
                 fd.write(obj)
-            self.send_msg(address, MessageTypes.WRITE_STORAGE_ANSWER, True)
+            self.send_msg(conn, address, MessageTypes.WRITE_STORAGE_ANSWER, True)
         except Exception:
-            self.send_msg(address, MessageTypes.WRITE_STORAGE_ANSWER, False)
+            self.send_msg(conn, address, MessageTypes.WRITE_STORAGE_ANSWER, False)
 
-    def do_delete(self, path, address):
+    def do_delete(self, conn, path, address):
         local_path = os.path.join(STORAGE_PREFIX, *path.split('/'))
         if os.path.isfile(local_path):
             os.remove(local_path)
-            self.send_msg(address, MessageTypes.DELETE_ANSWER, True)
+            self.send_msg(conn, address, MessageTypes.DELETE_ANSWER, True)
         else:
-            self.send_msg(address, MessageTypes.DELETE_ANSWER, False)
+            self.send_msg(conn, address, MessageTypes.DELETE_ANSWER, False)
 
-    def do_rm(self, path, address):
+    def do_rm(self, conn, path, address):
         local_path = os.path.join(STORAGE_PREFIX, *path.split('/'))
         if os.path.isdir(local_path):
             os.rmdir(local_path)
-            self.send_msg(address, MessageTypes.RM_ANSWER, True)
+            self.send_msg(conn, address, MessageTypes.RM_ANSWER, True)
         else:
-            self.send_msg(address, MessageTypes.RM_ANSWER, False)
+            self.send_msg(conn, address, MessageTypes.RM_ANSWER, False)
 
 
 def main():
