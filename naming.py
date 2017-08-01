@@ -221,6 +221,25 @@ def info(name):
         return not_found
 
 
+'''def get_storages():
+    storages = []
+    
+    cursor = db.cursor()
+    cursor.execute("SELECT id, url, free_storage FROM storage")
+
+    storages.append(STORAGE1)
+    storages.append(STORAGE2)
+
+file_obj = cursor.fetchone()
+for file_obj in cursor:
+    if file_obj:
+
+    if file_obj:
+        print (str(file_obj[1]) + " found with id = " + str(file_obj[0]))
+        res = "name:" + str(file_obj[1]) + " size:" + str(file_obj[3]) + " is_folder: " + str(file_obj[2])
+        return res
+'''
+
 def server():
     sock = socket.socket()
     sock.bind(('', 9000))
@@ -259,6 +278,17 @@ def server():
                 result = info(msg_param)
                 r_msg = (MessageTypes.INFO_ANSWER, msg_param, result)
 
+            if msg_type == MessageTypes.WRITE_NAMING:
+                file_size = int(msg[2])
+                result = write(msg_param, file_size)
+
+                STORAGE1 = ('localhost', 9001)
+                STORAGE2 = ('localhost', 9002)
+                storages = []
+                storages.append(STORAGE1)
+                storages.append(STORAGE2)
+
+                r_msg = (MessageTypes.WRITE_NAMING_ANSWER, msg_param, result, storages)
 
 
             print("Response message")
