@@ -8,6 +8,8 @@ import os
 import socket
 import sys
 import threading
+from common import MessageTypes
+
 
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(asctime)s:%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
@@ -61,13 +63,13 @@ class Node(SimpleSocket):
     def receive(self, received_data, client_address):
         (msg_type, path, obj) = cPickle.loads(received_data)
         logging.INFO('Received from host %s message %s', client_address, msg_type)
-        if msg_type == 'READ':
+        if msg_type == MessageTypes.READ:
             self.do_read(path, client_address)
-        elif msg_type == 'WRITE':
+        elif msg_type == MessageTypes.WRITE:
             self.do_write(path, obj, client_address, replicate=True)
         elif msg_type == 'REPLICATE':
             self.do_write(path, obj, client_address, replicate=False)
-        elif msg_type == 'DELETE':
+        elif msg_type == MessageTypes.DELETE:
             self.do_delete(path, client_address)
         elif msg_type == 'INFO':
             self.do_info(path, client_address)
@@ -77,11 +79,11 @@ class Node(SimpleSocket):
     def do_read(self, path, address):
         localpath = os.path.join(STORAGE_PREFIX, *path.split('/'))
         if not os.path.isfile(localpath):
-            self.send_msg(address, 'NOFILE')
+            self.send_msg(address, MessageTypes.READ_ANSWER, 'NOFILE')
             return
         with open(localpath) as fd:
             data = fd.read()
-        self.send_msg(address, 'READ', data)
+        self.send_msg(address, MessageTypes.READ, data)
 
     def do_write(self, path, obj, address, replicate):
         localpath = os.path.join(STORAGE_PREFIX, *path.split('/'))
@@ -99,7 +101,7 @@ class Node(SimpleSocket):
     def do_delete(self, path, address):
         localpath = os.path.join(STORAGE_PREFIX, *path.split('/'))
         if not os.path.isfile(localpath):
-            self.send_msg(address, 'NOFILE')
+            self.send_msg(address, MessageTypes.DELETE_ANSWER,'NOFILE')
             return
         os.remove(localpath)
         # Recursively remove empty directories.
@@ -109,12 +111,12 @@ class Node(SimpleSocket):
         #         break
         #     os.rmdir(prefix)
         #     localpath = prefix
-        self.send_msg(address, 'DELETE')
+        self.send_msg(address, MessageTypes.DELETE)
 
     def do_info(self, path, address):
         localpath = os.path.join(STORAGE_PREFIX, *path.split('/'))
         if not os.path.isfile(localpath):
-            self.send_msg(address, 'NOFILE')
+            self.send_msg(address, MessageTypes.INFO_ANSWER, 'NOFILE')
             return
         size = os.path.getsize(localpath)
         self.send_msg(address, 'INFO', size)
