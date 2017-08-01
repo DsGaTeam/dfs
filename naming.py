@@ -41,7 +41,7 @@ def rm(name):
         deleted_row_count = cursor.rowcount
         db.commit()
         if deleted_row_count > 0:
-            print dropdir + " was deleted"
+            print (dropdir + " was deleted")
             return True
         else:
             return False
@@ -107,22 +107,25 @@ def write(name, size):
                 parent_id = file_obj[0]
             else:
                 print (dir + " not found")
-                return False
+                return False, 0
 
         except (MySQLdb.Error, MySQLdb.Warning) as e:
             print(e)
-            return False
+            return False, 0
+
+    insert_id = 0
 
     try:
         cursor.execute(
             "INSERT INTO files (`name`, `parent_id`, `is_folder`, `size`) VALUES (%s, %s, %s, %s)",
             (filename, parent_id, 0, -size))
+        insert_id = cursor.lastrowid
         db.commit()
-        return True
+        return True, insert_id
 
     except (MySQLdb.Error, MySQLdb.Warning) as e:
         print(e)
-        return False
+        return False, 0
 
 
 def ls(name):
@@ -231,11 +234,26 @@ def get_storages():
 
     for storage in cursor:
         if storage:
-            print "Found storage:"
+            print ("Found storage:")
             pprint (storage)
             storages.append(storage)
 
     return storages
+
+def add_file_to_storages(file_id, storages):
+    for cur_storage in storages:
+        cursor = db.cursor()
+        try:
+            cursor.execute(
+                "INSERT INTO file_storage (`file_id`, `storage_id`) VALUES (%s, %s)",
+                (file_id, cur_storage))
+            db.commit()
+            return True
+
+        except (MySQLdb.Error, MySQLdb.Warning) as e:
+            print(e)
+            return False
+
 
 def server():
     sock = socket.socket()
@@ -277,11 +295,12 @@ def server():
 
             if msg_type == MessageTypes.WRITE_NAMING:
                 file_size = int(msg[2])
-                result = write(msg_param, file_size)
+                result, new_file_id = write(msg_param, file_size)
 
                 storages_list = get_storages()
 
                 storages = []
+                storage_ids = []
 
                 for storage in storages_list:
                     storage_port = DEFAULT_PORT + int(storage[0])  # id
@@ -289,9 +308,16 @@ def server():
                     #storage[2]  # free storage
                     STORAGE = (storage_host, storage_port)
                     storages.append(STORAGE)
-
+                    storage_ids.append(int(storage[0]))
                     if len(storages)>=2:
                         break
+
+                print ("new file id = " + str(new_file_id))
+                pprint (storage_ids)
+                if new_file_id>0:
+                    add_file_to_storages(new_file_id,storage_ids)
+                else:
+                    print ("Invalid file ID during write operation")
 
                 r_msg = (MessageTypes.WRITE_NAMING_ANSWER, msg_param, result, storages)
 
