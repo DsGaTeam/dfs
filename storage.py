@@ -56,12 +56,12 @@ class Node(SimpleSocket):
         self.naming_address = naming_address
 
     def send_msg(self, address, msg_type, data=None):
-        logging.info('Send to host %s message %s', address, msg_type)
+        logging.info('Send to host ' + str(address) + ' message ' + str(msg_type))
         self.send(address, pickle.dumps((msg_type, data)))
 
     def receive(self, received_data, client_address):
         (msg_type, path, obj) = pickle.loads(received_data)
-        logging.INFO('Received from host %s message %s', client_address, msg_type)
+        logging.INFO('Received from host ' + str(client_address) + ' message ' + str(msg_type))
         if msg_type == MessageTypes.READ:
             self.do_read(path, client_address)
         elif msg_type == MessageTypes.WRITE_STORAGE:
