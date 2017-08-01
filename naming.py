@@ -127,6 +127,7 @@ def ls(name):
     print("ls " + name)
     dirs = name.split("/")
     parent_id = 0
+    not_found = "not found"
 
     for dir in dirs:
         if dir == '':
@@ -142,17 +143,21 @@ def ls(name):
                 print (dir + " found with id = " + str(file_obj[0]))
                 parent_id = file_obj[0]
             else:
-                print (dir + " not found")
-                return False, []
+                print (dir + " " + not_found)
+                return False, [not_found]
 
         except (MySQLdb.Error, MySQLdb.Warning) as e:
             print(e)
-            return False, []
+            return False, [not_found]
 
     cursor = db.cursor()
     res = []
     try:
         cursor.execute("SELECT name,is_folder FROM `files` WHERE parent_id=" + str(parent_id) + " ORDER BY is_folder DESC")
+
+        if cursor.rowcount==0:
+            return False, [not_found]
+
         for file_obj in cursor:
             if file_obj:
                 if int(file_obj[1])!=1:
@@ -161,12 +166,14 @@ def ls(name):
                     resf = "d"
 
                 resf = resf + " " + str(file_obj[0])
+
                 print (resf)
 
                 res.append( resf )
+
     except (MySQLdb.Error, MySQLdb.Warning) as e:
         print(e)
-        return False, []
+        return False, [not_found]
 
     return True, res
 
@@ -246,8 +253,6 @@ def server():
 
             if msg_type == MessageTypes.LS:
                 result, ls_array = ls(msg_param)
-                if not result:
-                    ls_array=[]
                 r_msg = (MessageTypes.LS_ANSWER, msg_param, ls_array)
 
             if msg_type == MessageTypes.INFO:
