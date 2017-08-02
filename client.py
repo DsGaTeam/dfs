@@ -141,7 +141,7 @@ def write(server_address, local_file_name, dfs_file_name):
 
             msg_bytes = sock.recv(BUFFER_SIZE)
             msg = unpack_message(msg_bytes)
-            ensure_msg_validity(msg, MessageTypes.WRITE_STORAGE_ANSWER)
+            ensure_msg_validity(msg, MessageTypes.WRITE_STORAGE_ANSWER, 3)
 
             if msg[2]:
                 success.append(True)
