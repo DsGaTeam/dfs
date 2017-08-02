@@ -174,7 +174,33 @@ def info(server_address, file_name):
 
 
 def delete(server_address, file_name):
-    return one_step_operation(server_address, MessageTypes.DELETE, MessageTypes.DELETE_ANSWER, file_name)
+    storages = one_step_operation(server_address, MessageTypes.DELETE, MessageTypes.DELETE_ANSWER, file_name)
+
+    success = []
+    for storage in storages:
+        sock = open_socket(storage)
+
+        try:
+            msg_bytes = pack_message(MessageTypes.DELETE, file_name)
+            sock.send(msg_bytes)
+
+            msg_bytes = sock.recv(BUFFER_SIZE)
+            msg = unpack_message(msg_bytes)
+            ensure_msg_validity(msg, MessageTypes.DELETE_ANSWER, 3)
+
+            if msg[2]:
+                success.append(True)
+            else:
+                success.append(False)
+        except socket.timeout:
+            logging.error('Timeout was reached with storage ' + str(storage))
+        finally:
+            sock.close()
+
+    s = success.count(True)
+    l = len(success)
+
+    return 'Successfully deleted file \'' + str(file_name) + '\' from ' + str(s) + ' out of ' + str(l) + ' storage.'
 
 
 def cd(server_address, path):
@@ -237,7 +263,7 @@ while cmd != 'exit':
 
         elif command == 'delete':
             ensure_amount_of_params(params, 2)
-            res = mk(NAMING_SERVER_ADDRESS, params[1])
+            res = delete(NAMING_SERVER_ADDRESS, params[1])
             if res:
                 output = 'File \'' + params[1] + '\' was successfully removed.'
             else:
