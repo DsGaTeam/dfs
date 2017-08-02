@@ -49,11 +49,8 @@ class SimpleSocket(object):
 
 
 class Node(SimpleSocket):
-    def __init__(self, storage_id, storage_addresses, naming_address):
-        super(Node, self).__init__(storage_addresses[storage_id])
-        self.storage_id = storage_id
-        self.storage_addresses = storage_addresses
-        self.naming_address = naming_address
+    def __init__(self, storage_address):
+        super(Node, self).__init__(storage_address)
 
     def send_msg(self, conn, address, msg_type, name, data=None):
         logging.info('Send to host ' + str(address) + ' message ' + str(msg_type))
@@ -62,16 +59,22 @@ class Node(SimpleSocket):
     def receive(self, conn, received_data, client_address):
         (msg_type, path, obj) = pickle.loads(received_data)
         logging.info('Received from host ' + str(client_address) + ' message ' + str(msg_type))
-        if msg_type == MessageTypes.READ:
-            self.do_read(conn, path, client_address)
-        elif msg_type == MessageTypes.WRITE_STORAGE:
-            self.do_write(conn, path, obj, client_address)
-        elif msg_type == MessageTypes.DELETE:
-            self.do_delete(conn, path, client_address)
-        elif msg_type == MessageTypes.RM:
-            self.do_rm(conn, path, client_address)
-        else:
-            self.send_msg(conn, client_address, 'INVALID_REQ')
+        try:
+            if msg_type == MessageTypes.READ:
+                self.do_read(conn, path, client_address)
+            elif msg_type == MessageTypes.WRITE_STORAGE:
+                self.do_write(conn, path, obj, client_address)
+            elif msg_type == MessageTypes.DELETE:
+                self.do_delete(conn, path, client_address)
+            elif msg_type == MessageTypes.RM:
+                self.do_rm(conn, path, client_address)
+            else:
+                self.send_msg(conn, client_address, 'INVALID_REQ')
+                print('Invalid request: ' + str(msg_type))
+                logging.error('Invalid request: ' + str(msg_type))
+        except Exception as e:
+            print(e)
+            logging.error(e)
 
     def do_read(self, conn, path, address):
         local_path = os.path.join(STORAGE_PREFIX, *path.split('/'))
@@ -113,16 +116,18 @@ class Node(SimpleSocket):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('id', help='ID of this storage node', type=int)
+    ap.add_argument('-n', help='Hostname of this storage node in format <hostname>:<port>', nargs=1)
     args = ap.parse_args()
+    if args.n is not None and len(args.n) == 1:
+        name, port = args.n[0].split(':')
+        localhost = (str(name), int(port))
+        print(localhost)
+    else:
+        localhost = ('localhost', 9001)
     if os.path.isdir(STORAGE_PREFIX):
         shutil.rmtree(STORAGE_PREFIX)
     os.makedirs(STORAGE_PREFIX)
-    node = Node(
-        storage_id=args.id-1,
-        storage_addresses=[('localhost', 9001), ('localhost', 9002)],
-        naming_address=('localhost', 9000),
-    )
+    node = Node(storage_address=localhost)
     node.start_server()
 
 

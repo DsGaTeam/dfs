@@ -92,6 +92,9 @@ def read(server_address, file_name):
         if sock is not None:
             sock.close()
 
+    if len(msg[2]) == 0:
+        return 'Nothing to read.'
+
     for storage in msg[2]:
         sock = open_socket(storage)
 
@@ -200,6 +203,12 @@ def ensure_amount_of_params(params, amount):
 
 # COMMAND LINE INTERFACE
 
+if len(sys.argv) == 3:
+    host = str(sys.argv[1])
+    port = int(sys.argv[2])
+    NAMING_SERVER_ADDRESS = (host, port)
+    print('Set address of naming server to \'' + str(NAMING_SERVER_ADDRESS) + '\'.')
+
 cmd = ''
 while cmd != 'exit':
     cmd = sys.stdin.readline().strip()
@@ -274,6 +283,9 @@ while cmd != 'exit':
                 output = 'Unable to remove folder \'' + params[1] + '\''
             print(output)
             logging.info(output)
+
+        elif command == 'exit':
+            pass
 
         else:
             print('Unrecognized command \'' + command + '\'!')
