@@ -94,6 +94,84 @@ def read(name):
         return False, []
 
 
+def delete(name):
+    print("delete " + name)
+    dirs = name.split("/")
+    filename = dirs.pop()
+    print("filename is " + filename)
+    parent_id = 0
+
+    cursor = db.cursor()
+
+    for dir in dirs:
+        if dir == '':
+            continue
+        try:
+            cursor.execute("SELECT id FROM `files` WHERE name=%s AND parent_id=%s AND is_folder=1", (dir,parent_id))
+            file_obj = cursor.fetchone()
+            if file_obj:
+                print (dir + " found with id = " + str(file_obj[0]))
+                parent_id = file_obj[0]
+            else:
+                print (dir + " not found")
+                return False, []
+
+        except (MySQLdb.Error, MySQLdb.Warning) as e:
+            print(e)
+            return False, []
+
+    try:
+        cursor.execute("SELECT id, size FROM `files` WHERE name=%s AND parent_id=%s AND is_folder=0", (filename, parent_id))
+
+        file_obj = cursor.fetchone()
+        if file_obj:
+            file_id = file_obj[0]
+            file_size = file_obj[1]
+            print ("File found with id = " + str(file_id))
+
+            # dictionary of storages
+            storages_dict = get_storages_dict()
+            storages = []
+
+            cursor = db.cursor()
+            cursor.execute("SELECT storage_id FROM file_storage WHERE file_id = %s and %s", (file_id, "1"))
+
+            for storage in cursor:
+                if storage:
+                    print ("Found storage during read:")
+                    pprint(storage)
+                    storage_id = int(storage[0])
+                    storages.append( ( storages_dict[storage_id][1],  9000 + storage_id ) )
+
+                    try:
+                        cursor = db.cursor()
+                        print ("Deleting from file_storage... file_id=" + str(file_id) + "," + " storage_id=" + str(storage_id))
+                        cursor.execute("DELETE FROM `file_storage` WHERE file_id=%s AND storage_id=%s",
+                                       (file_id, storage_id))
+
+                        print ("Deleted " + str(cursor.rowcount))
+                        cursor = db.cursor()
+                        print ("Deleting from files...")
+                        cursor.execute("DELETE FROM `files` WHERE id=" + str(file_id))
+                        print ("Deleted " + str(cursor.rowcount))
+                        db.commit()
+
+                        add_space_to_storage(file_size, storage_id)
+
+                    except (MySQLdb.Error, MySQLdb.Warning) as e:
+                        print(e)
+                        return False, []
+
+            return storages
+        else:
+            print ("File not found")
+            return False, []
+
+    except (MySQLdb.Error, MySQLdb.Warning) as e:
+        print(e)
+        return False, []
+
+
 def check_folder_empty(name):
     print("check folder empty " + name)
     dirs = name.split("/")
@@ -298,7 +376,7 @@ def ls(name):
         cursor.execute("SELECT name,is_folder FROM `files` WHERE parent_id=" + str(parent_id) + " ORDER BY is_folder DESC")
 
         if cursor.rowcount==0:
-            return False, [not_found]
+            return False, ["empty"]
 
         for file_obj in cursor:
             if file_obj:
@@ -418,6 +496,23 @@ def add_file_to_storages(file_id, file_size, storages):
     return True
 
 
+def add_space_to_storage(file_size, storage_id):
+    print ("Adding space to storage = " + str(storage_id))
+    cursor = db.cursor()
+    try:
+        cursor.execute(
+            "UPDATE storage SET free_space = free_space + %s WHERE id = %s",
+            (file_size, storage_id))
+
+        print ("Updated rows:"+str(cursor.rowcount))
+        db.commit()
+
+    except (MySQLdb.Error, MySQLdb.Warning) as e:
+        print(e)
+        return False
+
+
+
 def server():
     sock = socket.socket()
     sock.bind(('', DEFAULT_PORT))
@@ -444,6 +539,9 @@ def server():
                 result = cd(msg_param)
                 r_msg = (MessageTypes.CD_ANSWER, msg_param, result)
 
+            if msg_type == MessageTypes.DELETE:
+                result = delete(msg_param)
+                r_msg = (MessageTypes.DELETE_ANSWER, msg_param, result)
 
             if msg_type == MessageTypes.MK:
                 result = mk(msg_param)
