@@ -240,19 +240,30 @@ def get_storages():
 
     return storages
 
-def add_file_to_storages(file_id, storages):
+def add_file_to_storages(file_id, file_size, storages):
     for cur_storage in storages:
+        print ("Adding to storage = " + str(cur_storage))
         cursor = db.cursor()
         try:
             cursor.execute(
                 "INSERT INTO file_storage (`file_id`, `storage_id`) VALUES (%s, %s)",
                 (file_id, cur_storage))
+
+            file_storage_id = cursor.lastrowid
+
             db.commit()
-            return True
+
+            cursor.execute(
+                "UPDATE storage SET free_space = free_space - %s WHERE id = %s AND free_space >= %s",
+                (file_size, cur_storage, file_size))
+            db.commit()
+
 
         except (MySQLdb.Error, MySQLdb.Warning) as e:
             print(e)
             return False
+
+    return True
 
 
 def server():
@@ -315,7 +326,7 @@ def server():
                 print ("new file id = " + str(new_file_id))
                 pprint (storage_ids)
                 if new_file_id>0:
-                    add_file_to_storages(new_file_id,storage_ids)
+                    add_file_to_storages(new_file_id, file_size, storage_ids)
                 else:
                     print ("Invalid file ID during write operation")
 
