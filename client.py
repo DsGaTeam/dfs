@@ -146,10 +146,7 @@ def write(server_address, local_file_name, dfs_file_name):
             msg = unpack_message(msg_bytes)
             ensure_msg_validity(msg, MessageTypes.WRITE_STORAGE_ANSWER, 3)
 
-            if msg[2]:
-                success.append(True)
-            else:
-                success.append(False)
+            success.append(msg[2])
         except socket.timeout:
             logging.error('Timeout was reached with storage ' + str(storage))
         finally:
@@ -188,10 +185,7 @@ def delete(server_address, file_name):
             msg = unpack_message(msg_bytes)
             ensure_msg_validity(msg, MessageTypes.DELETE_ANSWER, 3)
 
-            if msg[2]:
-                success.append(True)
-            else:
-                success.append(False)
+            success.append(msg[2])
         except socket.timeout:
             logging.error('Timeout was reached with storage ' + str(storage))
         finally:
