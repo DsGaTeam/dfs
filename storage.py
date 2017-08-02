@@ -57,7 +57,13 @@ class Node(SimpleSocket):
         self.send(conn, address, pickle.dumps((msg_type, name, data)))
 
     def receive(self, conn, received_data, client_address):
-        (msg_type, path, obj) = pickle.loads(received_data)
+        msg = pickle.loads(received_data)
+        msg_type = msg[0]
+        path = msg[1]
+        if len(msg) == 3:
+            obj = msg[2]
+        else:
+            obj = None
         logging.info('Received from host ' + str(client_address) + ' message ' + str(msg_type))
         try:
             if msg_type == MessageTypes.READ:
