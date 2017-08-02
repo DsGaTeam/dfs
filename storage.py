@@ -124,6 +124,8 @@ def main():
         print(localhost)
     else:
         localhost = ('localhost', 9001)
+    global STORAGE_PREFIX
+    STORAGE_PREFIX = os.path.join('storage', str(localhost[1]))
     if os.path.isdir(STORAGE_PREFIX):
         shutil.rmtree(STORAGE_PREFIX)
     os.makedirs(STORAGE_PREFIX)
