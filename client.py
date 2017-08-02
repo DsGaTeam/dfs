@@ -154,6 +154,15 @@ def write(server_address, local_file_name, dfs_file_name):
 
     s = success.count(True)
     l = len(success)
+
+    sock = open_socket(server_address)
+    try:
+        msg_bytes = pack_message(MessageTypes.WRITE_NAMING_CONFIRMATION, dfs_file_name, s)
+        sock.send(msg_bytes)
+    finally:
+        if sock is not None:
+            sock.close()
+
     return 'Successfully wrote to ' + str(s) + ' out of ' + str(l) + ' storage.'
 
 
