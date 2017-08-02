@@ -249,11 +249,11 @@ while cmd != 'exit':
         elif command == 'ls':
             ensure_amount_of_params(params, 2)
             res = ls(NAMING_SERVER_ADDRESS, params[1])
-            print('Content of the folder \'' + params[1] + '\'')
-            logging.info('Content of the folder \'' + params[1] + '\'')
+            print('Content of the folder \'' + params[1] + '\':')
+            logging.info('Content of the folder \'' + params[1] + '\':')
             for line in res:
-                print(line)
-                logging.info(line)
+                print('\t' + line)
+                logging.info('\t' + line)
 
         elif command == 'mk':
             ensure_amount_of_params(params, 2)
