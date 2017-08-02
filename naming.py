@@ -121,11 +121,12 @@ def delete(name):
             return False, []
 
     try:
-        cursor.execute("SELECT id FROM `files` WHERE name=%s AND parent_id=%s AND is_folder=0", (filename, parent_id))
+        cursor.execute("SELECT id, size FROM `files` WHERE name=%s AND parent_id=%s AND is_folder=0", (filename, parent_id))
 
         file_obj = cursor.fetchone()
         if file_obj:
             file_id = file_obj[0]
+            file_size = file_obj[1]
             print ("File found with id = " + str(file_id))
 
             # dictionary of storages
@@ -154,6 +155,8 @@ def delete(name):
                         cursor.execute("DELETE FROM `files` WHERE id=" + str(file_id))
                         print ("Deleted " + str(cursor.rowcount))
                         db.commit()
+
+                        add_space_to_storage(file_size, storage_id)
 
                     except (MySQLdb.Error, MySQLdb.Warning) as e:
                         print(e)
@@ -491,6 +494,23 @@ def add_file_to_storages(file_id, file_size, storages):
             return False
 
     return True
+
+
+def add_space_to_storage(file_size, storage_id):
+    print ("Adding space to storage = " + str(storage_id))
+    cursor = db.cursor()
+    try:
+        cursor.execute(
+            "UPDATE storage SET free_space = free_space + %s WHERE id = %s",
+            (file_size, storage_id))
+
+        print ("Updated rows:"+str(cursor.rowcount))
+        db.commit()
+
+    except (MySQLdb.Error, MySQLdb.Warning) as e:
+        print(e)
+        return False
+
 
 
 def server():
