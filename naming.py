@@ -9,6 +9,128 @@ from common import MessageTypes
 
 DEFAULT_PORT = 9000
 
+def cd(name):
+    print("cd " + name)
+    dirs = name.split("/")
+    parent_id = 0
+
+    cursor = db.cursor()
+
+    for dir in dirs:
+        if dir == '':
+            continue
+        try:
+            cursor.execute("SELECT id FROM `files` WHERE name=%s AND parent_id=%s AND is_folder=1", (dir,parent_id))
+            file_obj = cursor.fetchone()
+            if file_obj:
+                print (dir + " found with id = " + str(file_obj[0]))
+                parent_id = file_obj[0]
+            else:
+                print (dir + " not found")
+                return False
+
+        except (MySQLdb.Error, MySQLdb.Warning) as e:
+            print(e)
+            return False
+
+    return True
+
+
+def read(name):
+    print("read " + name)
+    dirs = name.split("/")
+    filename = dirs.pop()
+    print("filename is " + filename)
+    parent_id = 0
+
+    cursor = db.cursor()
+
+    for dir in dirs:
+        if dir == '':
+            continue
+        try:
+            cursor.execute("SELECT id FROM `files` WHERE name=%s AND parent_id=%s AND is_folder=1", (dir,parent_id))
+            file_obj = cursor.fetchone()
+            if file_obj:
+                print (dir + " found with id = " + str(file_obj[0]))
+                parent_id = file_obj[0]
+            else:
+                print (dir + " not found")
+                return False, []
+
+        except (MySQLdb.Error, MySQLdb.Warning) as e:
+            print(e)
+            return False, []
+
+    try:
+        cursor.execute("SELECT id FROM `files` WHERE name=%s AND parent_id=%s AND is_folder=0", (filename, parent_id))
+
+        file_obj = cursor.fetchone()
+        if file_obj:
+            file_id = file_obj[0]
+            print ("File found with id = " + str(file_id))
+
+            # dictionary of storages
+            storages_dict = get_storages_dict()
+            storages = []
+
+            cursor = db.cursor()
+            cursor.execute("SELECT storage_id FROM file_storage WHERE file_id = %s and %s", (file_id, "1"))
+
+            for storage in cursor:
+                if storage:
+                    print ("Found storage during read:")
+                    pprint(storage)
+                    storage_id = int(storage[0])
+                    storages.append( ( storages_dict[storage_id][1],  9000 + storage_id ) )
+
+            return storages
+        else:
+            print ("File not found")
+            return False, []
+
+    except (MySQLdb.Error, MySQLdb.Warning) as e:
+        print(e)
+        return False, []
+
+
+def check_folder_empty(name):
+    print("check folder empty " + name)
+    dirs = name.split("/")
+    parent_id = 0
+    for dir in dirs:
+        if dir == '':
+            continue
+        cursor = db.cursor()
+
+        try:
+            cursor.execute("SELECT id FROM `files` WHERE name=%s AND parent_id=%s AND is_folder=1", (dir,parent_id))
+            file_obj = cursor.fetchone()
+            if file_obj:
+                print (dir + " found with id = " + str(file_obj[0]))
+                parent_id = file_obj[0]
+            else:
+                print (dir + " not found")
+                return False
+
+        except (MySQLdb.Error, MySQLdb.Warning) as e:
+            print(e)
+            return False
+
+    try:
+        cursor.execute("SELECT id FROM `files` WHERE parent_id=%s ORDER BY %s", (parent_id,"name"))
+
+        if cursor.rowcount==0:
+            return True
+        else:
+            print (name + " not empty")
+            return False
+
+    except (MySQLdb.Error, MySQLdb.Warning) as e:
+        print(e)
+        return False
+
+
 def rm(name):
     print("rm " + name)
     dirs = name.split("/")
@@ -87,7 +209,7 @@ def mk(name):
     return True
 
 
-def write(name, size):
+def write(name, size, confirm):
     print("write " + name)
     dirs = name.split("/")
     filename = dirs.pop()
@@ -113,19 +235,34 @@ def write(name, size):
             print(e)
             return False, 0
 
-    insert_id = 0
+    if confirm:
 
-    try:
-        cursor.execute(
-            "INSERT INTO files (`name`, `parent_id`, `is_folder`, `size`) VALUES (%s, %s, %s, %s)",
-            (filename, parent_id, 0, -size))
-        insert_id = cursor.lastrowid
-        db.commit()
-        return True, insert_id
+        try:
+            cursor.execute(
+                "UPDATE files SET size=size*(-1) WHERE name=%s AND parent_id=%s AND size < 0",
+                (filename, parent_id))
+            db.commit()
+            return True, 0
 
-    except (MySQLdb.Error, MySQLdb.Warning) as e:
-        print(e)
-        return False, 0
+        except (MySQLdb.Error, MySQLdb.Warning) as e:
+            print(e)
+            return False, 0
+
+    else:
+
+        insert_id = 0
+
+        try:
+            cursor.execute(
+                "INSERT INTO files (`name`, `parent_id`, `is_folder`, `size`) VALUES (%s, %s, %s, %s)",
+                (filename, parent_id, 0, -size))
+            insert_id = cursor.lastrowid
+            db.commit()
+            return True, insert_id
+
+        except (MySQLdb.Error, MySQLdb.Warning) as e:
+            print(e)
+            return False, 0
 
 
 def ls(name):
@@ -240,6 +377,21 @@ def get_storages():
 
     return storages
 
+
+def get_storages_dict():
+    storages = {}
+
+    cursor = db.cursor()
+    cursor.execute("SELECT id, url, free_space FROM storage ORDER BY id ASC, free_space DESC")
+
+    for storage in cursor:
+        if storage:
+            print ("Found storage:")
+            storages[storage[0]]=storage
+
+    return storages
+
+
 def add_file_to_storages(file_id, file_size, storages):
     for cur_storage in storages:
         print ("Adding to storage = " + str(cur_storage))
@@ -288,12 +440,19 @@ def server():
             pprint (msg)
 
             # RESPONSE
+            if msg_type == MessageTypes.CD:
+                result = cd(msg_param)
+                r_msg = (MessageTypes.CD_ANSWER, msg_param, result)
+
+
             if msg_type == MessageTypes.MK:
                 result = mk(msg_param)
                 r_msg = (MessageTypes.MK_ANSWER, msg_param, result)
 
             if msg_type == MessageTypes.RM:
-                result = rm(msg_param)
+                result = check_folder_empty(msg_param)
+                if result==True:
+                    result = rm(msg_param)
                 r_msg = (MessageTypes.RM_ANSWER, msg_param, result)
 
             if msg_type == MessageTypes.LS:
@@ -304,19 +463,26 @@ def server():
                 result = info(msg_param)
                 r_msg = (MessageTypes.INFO_ANSWER, msg_param, result)
 
+            if msg_type == MessageTypes.READ:
+                result = read(msg_param)
+                r_msg = (MessageTypes.READ_ANSWER, msg_param, result)
+
             if msg_type == MessageTypes.WRITE_NAMING:
                 file_size = int(msg[2])
-                result, new_file_id = write(msg_param, file_size)
+                result, new_file_id = write(msg_param, file_size, False)
 
                 storages_list = get_storages()
 
                 storages = []
                 storage_ids = []
 
+                out_of_space = False
+
                 for storage in storages_list:
                     storage_port = DEFAULT_PORT + int(storage[0])  # id
                     storage_host = str(storage[1])                 # url
-                    #storage[2]  # free storage
+                    if storage[2]<file_size:                       # free storage
+                        out_of_space = True
                     STORAGE = (storage_host, storage_port)
                     storages.append(STORAGE)
                     storage_ids.append(int(storage[0]))
@@ -325,12 +491,18 @@ def server():
 
                 print ("new file id = " + str(new_file_id))
                 pprint (storage_ids)
-                if new_file_id>0:
+                if new_file_id>0 or out_of_space:
                     add_file_to_storages(new_file_id, file_size, storage_ids)
                 else:
                     print ("Invalid file ID during write operation")
+                    result = False
 
                 r_msg = (MessageTypes.WRITE_NAMING_ANSWER, msg_param, result, storages)
+
+            if msg_type == MessageTypes.WRITE_NAMING_CONFIRMATION:
+                file_name = msg_param
+                print ("Confirm write:" + file_name)
+                result = write(file_name, 0, True)
 
             print("Response message")
             pprint (r_msg)
@@ -338,6 +510,8 @@ def server():
             response_msg = pickle.dumps(r_msg)
 
             conn.send(response_msg)
+
+
 
         conn.close()
 
